@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+  <!-- Left page -->
+  <path
+      android:fillColor="@color/launcher_book_page"
+      android:pathData="M28,70 L48,74 L50,38 Q40,35 28,34 Z" />
+  <!-- Right page -->
+  <path
+      android:fillColor="@color/launcher_book_page"
+      android:pathData="M60,74 L80,70 L80,34 Q68,35 58,38 Z" />
+  <!-- Spine -->
+  <path
+      android:fillColor="@color/launcher_book_spine"
+      android:pathData="M48,72h12v4h-12z" />
+  <!-- Center crease -->
+  <path
+      android:fillColor="@color/launcher_book_spine"
+      android:pathData="M53,38 L55,38 L54,74 Z" />
+  <!-- Sound waves -->
+  <path
+      android:fillColor="@android:color/transparent"
+      android:pathData="M68,49 A8,8 0 0,1 68,59"
+      android:strokeWidth="2.5"
+      android:strokeColor="@color/launcher_wave"
+      android:strokeLineCap="round" />
+  <path
+      android:fillColor="@android:color/transparent"
+      android:pathData="M73,45 A14,14 0 0,1 73,63"
+      android:strokeWidth="2.5"
+      android:strokeColor="@color/launcher_wave"
+      android:strokeLineCap="round" />
+  <path
+      android:fillColor="@android:color/transparent"
+      android:pathData="M78,41 A20,20 0 0,1 78,67"
+      android:strokeWidth="2.5"
+      android:strokeColor="@color/launcher_wave"
+      android:strokeLineCap="round" />
+</vector>
