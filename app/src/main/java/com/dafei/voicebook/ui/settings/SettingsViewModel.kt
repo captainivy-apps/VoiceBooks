@@ -56,6 +56,7 @@ data class SettingsUiState(
     val previewingModelId: String? = null,
     val draftInitialized: Boolean = false,
     val previewText: String = "",
+    val mirrorBaseUrl: String = "",
     val uploadServerEnabled: Boolean = false,
     val uploadServerAddress: String? = null,
     val rebuildRunning: Boolean = false,
@@ -176,6 +177,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             previewingModelId = bundle.tts.previewingModelId,
             draftInitialized = bundle.tts.draftInitialized,
             previewText = bundle.settings.ttsPreviewText.ifBlank { defaultPreview },
+            mirrorBaseUrl = bundle.settings.mirrorBaseUrl,
             uploadServerEnabled = uploadServerEnabled,
             uploadServerAddress = if (uploadServerEnabled) serverAddress else null,
             rebuildRunning = rebuildProgress.isRunning,
@@ -433,6 +435,12 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun setPreviewText(text: String) {
         viewModelScope.launch {
             app.settingsRepository.setTtsPreviewText(text)
+        }
+    }
+
+    fun setMirrorBaseUrl(url: String) {
+        viewModelScope.launch {
+            app.settingsRepository.setMirrorBaseUrl(url)
         }
     }
 

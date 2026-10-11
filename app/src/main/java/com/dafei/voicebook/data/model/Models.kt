@@ -99,7 +99,6 @@ data class TtsModelInfo(
     val language: String,
     val sizeBytes: Long,
     val downloadUrl: String,
-    val mirrorDownloadUrl: String? = null,
     val modelType: String = "vits",
     val family: TtsModelFamily = TtsModelFamily.VITS,
     val speakerId: Int = 0,

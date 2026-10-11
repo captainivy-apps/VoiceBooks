@@ -37,6 +37,7 @@ import com.dafei.voicebook.tts.StreamingSynthStats
 import com.dafei.voicebook.tts.SynthesizedAudio
 import com.dafei.voicebook.tts.TtsTextAdapter
 import com.dafei.voicebook.tts.TtsTextChunker
+import com.dafei.voicebook.tts.normalizeChunksForPlayback
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineExceptionHandler
@@ -1260,21 +1261,18 @@ class TtsPlaybackService : LifecycleService() {
 
                 val pcmChunks = mutableListOf<FloatArray>()
                 var sampleRate = 0
-                val gain = StreamingGain()
-                gain.reset()
                 val synthesisMs = measureTimeMillis {
                     withContext(sherpaDispatcher) {
                         val effectiveSpeakerId = sherpaEngine.resolveSpeakerId(speakerId)
                         for (chunk in chunks) {
                             if (!isActive || !preloadsEnabled) return@withContext
-                            var stats = sherpaEngine.synthesizeStreaming(
+                            val stats = sherpaEngine.synthesizeStreaming(
                                 text = chunk,
                                 speed = sherpaSpeed,
                                 speakerId = effectiveSpeakerId,
                                 shouldContinue = { isActive && preloadsEnabled },
                                 onChunk = chunk@{ samples ->
                                     if (!isActive || !preloadsEnabled) return@chunk 0
-                                    gain.applyInPlace(samples)
                                     if (sampleRate == 0) sampleRate = sherpaEngine.sampleRate()
                                     pcmChunks.add(samples.copyOf())
                                     1
@@ -1283,7 +1281,6 @@ class TtsPlaybackService : LifecycleService() {
                             if (stats == null || stats.totalSamples <= 0) {
                                 val batch = sherpaEngine.synthesize(chunk, sherpaSpeed, effectiveSpeakerId)
                                 if (batch == null || !batch.isPlayable()) return@withContext
-                                gain.applyInPlace(batch.samples)
                                 pcmChunks.add(batch.samples.copyOf())
                                 if (sampleRate == 0) sampleRate = batch.sampleRate
                             } else if (stats.stoppedEarly) {
@@ -1293,6 +1290,11 @@ class TtsPlaybackService : LifecycleService() {
                         }
                     }
                 }
+
+                // One shared gain for the whole sentence: per-chunk gain made loudness depend on
+                // whichever chunk was estimated first (MeloTTS pitched/soft onsets), causing
+                // the "忽高忽低" fluctuation.
+                normalizeChunksForPlayback(pcmChunks)
 
                 val preloaded = PreloadedSentence(pcmChunks, sampleRate, synthesisMs)
                 if (!preloaded.isPlayable()) {

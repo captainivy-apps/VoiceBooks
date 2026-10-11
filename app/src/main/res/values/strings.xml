@@ -114,6 +114,9 @@
     <string name="tts_management">TTS 引擎管理</string>
     <string name="download">下载</string>
     <string name="mirror_download">镜像下载</string>
+    <string name="mirror_base_url_title">模型镜像地址</string>
+    <string name="mirror_base_url_desc">可选。填写后，模型下载失败时可从该镜像地址重试；留空则关闭镜像下载。</string>
+    <string name="mirror_base_url_hint">https://example.com/mirrors</string>
     <string name="set_default">设为默认</string>
     <string name="default_label">默认</string>
     <string name="downloading">下载中</string>

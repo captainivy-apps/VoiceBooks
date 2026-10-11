@@ -9,10 +9,10 @@ import kotlin.math.sqrt
 
 class StreamingGainTest {
     @Test
-    fun locksGainFromFirstChunk() {
+    fun locksGainAfterWarmUpWindow() {
         val gain = StreamingGain()
-        val chunk1 = FloatArray(100) { 0.01f }
-        val chunk2 = FloatArray(100) { 0.01f }
+        val chunk1 = FloatArray(5000) { 0.05f }
+        val chunk2 = FloatArray(5000) { 0.05f }
 
         gain.applyInPlace(chunk1)
         val rmsAfterFirst = rms(chunk1)
@@ -25,20 +25,33 @@ class StreamingGainTest {
     }
 
     @Test
+    fun ignoresSilentLeadIn() {
+        val gain = StreamingGain()
+        val silent = FloatArray(5000) { 0f }
+        val speech = FloatArray(5000) { 0.03f }
+
+        gain.applyInPlace(silent)
+        assertTrue(silent.all { it == 0f })
+
+        gain.applyInPlace(speech)
+        val speechRms = rms(speech)
+        assertTrue(speechRms in 0.08f..0.16f)
+    }
+
+    @Test
     fun resetAllowsNewEstimate() {
         val gain = StreamingGain()
-        val quiet = FloatArray(50) { 0.005f }
-        val loud = FloatArray(50) { 0.2f }
+        val quiet = FloatArray(5000) { 0.03f }
+        val loud = FloatArray(5000) { 0.2f }
 
         gain.applyInPlace(quiet)
-        val quietRms = rms(quiet)
 
         gain.reset()
         gain.applyInPlace(loud)
         val loudRms = rms(loud)
 
-        assertTrue(loudRms > quietRms)
         assertTrue(loudRms in 0.08f..0.16f)
+        assertTrue(loud.maxOf { abs(it) } <= TtsAudioProfile.MAX_PEAK + 0.01f)
     }
 
     private fun rms(samples: FloatArray): Float {

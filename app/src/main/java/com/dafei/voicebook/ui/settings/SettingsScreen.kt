@@ -143,6 +143,8 @@ fun SettingsScreen(
                         previewText = uiState.previewText,
                         onPreviewTextChange = viewModel::setPreviewText,
                         previewEnabled = uiState.engineSwitchState != EngineSwitchState.Applying,
+                        mirrorBaseUrl = uiState.mirrorBaseUrl,
+                        onMirrorBaseUrlChange = viewModel::setMirrorBaseUrl,
                         uploadServerEnabled = uiState.uploadServerEnabled,
                         onUploadServerEnabledChange = viewModel::setUploadServerEnabled,
                         uploadServerAddress = uiState.uploadServerAddress,
@@ -289,6 +291,8 @@ private fun GeneralSettingsTab(
     previewText: String,
     onPreviewTextChange: (String) -> Unit,
     previewEnabled: Boolean,
+    mirrorBaseUrl: String,
+    onMirrorBaseUrlChange: (String) -> Unit,
     uploadServerEnabled: Boolean,
     onUploadServerEnabledChange: (Boolean) -> Unit,
     uploadServerAddress: String?,
@@ -327,6 +331,11 @@ private fun GeneralSettingsTab(
             onEnabledChange = onUploadServerEnabledChange,
             serverAddress = uploadServerAddress,
             onCopyAddress = onCopyUploadServerAddress,
+        )
+
+        MirrorSourceSection(
+            mirrorBaseUrl = mirrorBaseUrl,
+            onMirrorBaseUrlChange = onMirrorBaseUrlChange,
         )
 
         BatteryOptimizationSection(
@@ -531,6 +540,37 @@ private fun UploadServerSection(
 }
 
 @Composable
+private fun MirrorSourceSection(
+    mirrorBaseUrl: String,
+    onMirrorBaseUrlChange: (String) -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+    ) {
+        Text(
+            text = stringResource(R.string.mirror_base_url_title),
+            style = MaterialTheme.typography.titleSmall,
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = stringResource(R.string.mirror_base_url_desc),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        OutlinedTextField(
+            value = mirrorBaseUrl,
+            onValueChange = onMirrorBaseUrlChange,
+            modifier = Modifier.fillMaxWidth(),
+            placeholder = { Text(stringResource(R.string.mirror_base_url_hint)) },
+            singleLine = true,
+        )
+    }
+}
+
+@Composable
 private fun BatteryOptimizationSection(
     isIgnoringBatteryOptimizations: Boolean,
     onOpenSettings: () -> Unit,
@@ -597,6 +637,7 @@ private fun TtsManagementTab(
     val languageFilter = uiState.selectedLanguageFilter
     val familyIndex = BuiltInTtsModels.FAMILIES.indexOf(uiState.selectedFamily).coerceAtLeast(0)
     val isBusy = uiState.engineSwitchState != EngineSwitchState.Idle
+    val hasMirrorDownload = uiState.mirrorBaseUrl.isNotBlank()
 
     Column(modifier = Modifier.fillMaxSize()) {
         TabRow(selectedTabIndex = familyIndex) {
@@ -667,6 +708,7 @@ private fun TtsManagementTab(
                         pendingSpeakerId = pendingSpeaker,
                         progress = uiState.downloadProgress[model.id],
                         benchmark = benchmark,
+                        hasMirrorDownload = hasMirrorDownload,
                         isPreviewing = uiState.previewingModelId == model.id &&
                             uiState.engineSwitchState == EngineSwitchState.Previewing,
                         isBusy = isBusy,
@@ -777,6 +819,7 @@ private fun TtsModelCard(
     pendingSpeakerId: Int,
     progress: Float?,
     benchmark: TtsModelBenchmark?,
+    hasMirrorDownload: Boolean,
     isPreviewing: Boolean,
     isBusy: Boolean,
     onDownload: (Boolean) -> Unit,
@@ -789,7 +832,6 @@ private fun TtsModelCard(
 ) {
     val modelInfo = BuiltInTtsModels.infoFor(model.id)
     val speakerCount = modelInfo?.speakerCount ?: 1
-    val hasMirrorDownload = modelInfo?.mirrorDownloadUrl != null
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(

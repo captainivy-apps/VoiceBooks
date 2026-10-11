@@ -1,6 +1,7 @@
 package com.dafei.voicebook
 
 import com.dafei.voicebook.tts.TtsAudioProfile
+import com.dafei.voicebook.tts.normalizeChunksForPlayback
 import com.dafei.voicebook.tts.normalizeForPlayback
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -34,6 +35,19 @@ class AudioNormalizationTest {
         val normalized = normalizeForPlayback(balanced)
 
         assertTrue(balanced.contentEquals(normalized))
+    }
+
+    @Test
+    fun chunkListIsNormalizedWithOneSharedGain() {
+        val first = FloatArray(3000) { 0.05f }
+        val second = FloatArray(3000) { 0.05f }
+        val chunks = listOf(first, second)
+
+        normalizeChunksForPlayback(chunks)
+
+        val combined = first + second
+        assertEquals(TtsAudioProfile.TARGET_RMS, rmsOf(combined), 0.02f)
+        assertTrue(combined.maxOf { abs(it) } <= TtsAudioProfile.MAX_PEAK + 0.01f)
     }
 
     private fun rmsOf(samples: FloatArray): Float {

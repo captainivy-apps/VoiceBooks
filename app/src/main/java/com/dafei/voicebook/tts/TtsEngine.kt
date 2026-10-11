@@ -51,6 +51,50 @@ fun normalizePeakAmplitude(samples: FloatArray, targetPeak: Float = TtsAudioProf
     return normalizeForPlayback(samples, targetRms = TtsAudioProfile.TARGET_RMS, maxPeak = targetPeak)
 }
 
+/**
+ * Normalize a whole sentence split across multiple PCM chunks with one shared gain.
+ *
+ * Applying gain per streaming callback chunk makes loudness depend on whichever chunk happens
+ * to be estimated first (e.g. a quiet MeloTTS onset forces a large gain and clips later speech,
+ * so sentences alternate between loud and soft). Estimating from the combined signal keeps every
+ * sentence at the same target loudness.
+ */
+fun normalizeChunksForPlayback(chunks: List<FloatArray>) {
+    if (chunks.isEmpty()) return
+
+    var sumSquares = 0.0
+    var sampleCount = 0
+    for (chunk in chunks) {
+        for (sample in chunk) {
+            sumSquares += (sample * sample).toDouble()
+        }
+        sampleCount += chunk.size
+    }
+    if (sampleCount == 0) return
+
+    val rms = sqrt(sumSquares / sampleCount).toFloat()
+    if (rms < 1e-6f) return
+
+    var gain = TtsAudioProfile.TARGET_RMS / rms
+    var peak = 0f
+    for (chunk in chunks) {
+        for (sample in chunk) {
+            peak = maxOf(peak, abs(sample * gain))
+        }
+    }
+    if (peak > TtsAudioProfile.MAX_PEAK) {
+        gain *= TtsAudioProfile.MAX_PEAK / peak
+    }
+    if (abs(gain - 1f) < 0.02f) return
+
+    gain = gain.coerceIn(TtsAudioProfile.MIN_GAIN, TtsAudioProfile.MAX_GAIN)
+    for (chunk in chunks) {
+        for (index in chunk.indices) {
+            chunk[index] = (chunk[index] * gain).coerceIn(-1f, 1f)
+        }
+    }
+}
+
 data class StreamingSynthStats(
     val sampleRate: Int,
     val totalSamples: Int,

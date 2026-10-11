@@ -29,6 +29,7 @@ data class UserSettings(
     val sleepTimerMinutes: Int = 0,
     val sleepUntilEndOfBook: Boolean = false,
     val ttsPreviewText: String = "",
+    val mirrorBaseUrl: String = "",
 )
 
 class SettingsRepository(private val context: Context) {
@@ -42,6 +43,7 @@ class SettingsRepository(private val context: Context) {
         val SLEEP_TIMER_MINUTES = intPreferencesKey("sleep_timer_minutes")
         val SLEEP_UNTIL_END = booleanPreferencesKey("sleep_until_end")
         val TTS_PREVIEW_TEXT = stringPreferencesKey("tts_preview_text")
+        val MIRROR_BASE_URL = stringPreferencesKey("mirror_base_url")
     }
 
     val settings: Flow<UserSettings> = context.dataStore.data
@@ -64,6 +66,7 @@ class SettingsRepository(private val context: Context) {
                 sleepTimerMinutes = prefs[Keys.SLEEP_TIMER_MINUTES] ?: 0,
                 sleepUntilEndOfBook = prefs[Keys.SLEEP_UNTIL_END] ?: false,
                 ttsPreviewText = prefs[Keys.TTS_PREVIEW_TEXT] ?: "",
+                mirrorBaseUrl = prefs[Keys.MIRROR_BASE_URL] ?: "",
             )
         }
 
@@ -113,5 +116,9 @@ class SettingsRepository(private val context: Context) {
 
     suspend fun setTtsPreviewText(text: String) {
         context.dataStore.edit { it[Keys.TTS_PREVIEW_TEXT] = text }
+    }
+
+    suspend fun setMirrorBaseUrl(url: String) {
+        context.dataStore.edit { it[Keys.MIRROR_BASE_URL] = url.trim() }
     }
 }

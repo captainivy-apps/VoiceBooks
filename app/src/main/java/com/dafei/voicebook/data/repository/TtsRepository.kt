@@ -131,9 +131,10 @@ class TtsRepository(
         targetDir.deleteRecursively()
 
         val url = if (useMirror) {
-            BuiltInTtsModels.infoFor(modelId)?.mirrorDownloadUrl
-                ?: return TtsModelDownloadResult.Failure("该模型暂无镜像").also {
-                    dao.updateDownloadState(modelId, TtsDownloadState.FAILED.name, null, "该模型暂无镜像")
+            val mirrorBaseUrl = settingsRepository.settings.first().mirrorBaseUrl
+            BuiltInTtsModels.mirrorUrlFor(modelId, mirrorBaseUrl)
+                ?: return TtsModelDownloadResult.Failure("未配置镜像地址").also {
+                    dao.updateDownloadState(modelId, TtsDownloadState.FAILED.name, null, "未配置镜像地址")
                 }
         } else {
             model.downloadUrl

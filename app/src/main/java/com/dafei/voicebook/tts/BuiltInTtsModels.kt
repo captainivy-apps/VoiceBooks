@@ -5,7 +5,6 @@ import com.dafei.voicebook.data.model.TtsModelInfo
 
 object BuiltInTtsModels {
     private const val BASE_URL = "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models"
-    private const val MIRROR_BASE_URL = "https://www.galaxyrover.com/mirrors"
 
     private val VITS_MODELS = listOf(
         TtsModelInfo(
@@ -213,7 +212,6 @@ object BuiltInTtsModels {
             language = "zh",
             sizeBytes = 57_700_000L,
             downloadUrl = "$BASE_URL/vits-piper-zh_CN-xiao_ya-medium.tar.bz2",
-            mirrorDownloadUrl = "$MIRROR_BASE_URL/vits-piper-zh_CN-xiao_ya-medium.tar.bz2",
             modelType = "vits",
             speakerCount = 1,
         ),
@@ -269,7 +267,6 @@ object BuiltInTtsModels {
             language = "en",
             sizeBytes = 65_523_000L,
             downloadUrl = "$BASE_URL/vits-piper-en_US-amy-low.tar.bz2",
-            mirrorDownloadUrl = "$MIRROR_BASE_URL/vits-piper-en_US-amy-low.tar.bz2",
             modelType = "vits",
             speakerCount = 1,
         ),
@@ -536,4 +533,16 @@ object BuiltInTtsModels {
         MODELS.filter { it.family == family }
 
     fun infoFor(id: String): TtsModelInfo? = MODELS.find { it.id == id }
+
+    /**
+     * Build a mirror download URL for [modelId] from a user-configured mirror base.
+     * Returns null when no base is configured, so mirror download stays unavailable by default.
+     */
+    fun mirrorUrlFor(modelId: String, mirrorBaseUrl: String): String? {
+        val base = mirrorBaseUrl.trim().trimEnd('/')
+        if (base.isEmpty()) return null
+        val fileName = infoFor(modelId)?.downloadUrl?.substringAfterLast('/')?.takeIf { it.isNotEmpty() }
+            ?: return null
+        return "$base/$fileName"
+    }
 }
