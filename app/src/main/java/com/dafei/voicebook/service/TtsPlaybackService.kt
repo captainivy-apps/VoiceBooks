@@ -1474,6 +1474,21 @@ class TtsPlaybackService : LifecycleService() {
             }
         }
 
+        // Flush the look-ahead warm-up window (short sentences may never reach the lock threshold).
+        if (shouldContinuePlayback()) {
+            withContext(sherpaDispatcher) {
+                val tail = gain.flush()
+                if (tail.isNotEmpty()) {
+                    writeStreamChunk(
+                        samples = tail,
+                        sampleRate = sampleRate,
+                        state = writeState,
+                        shouldContinue = shouldContinuePlayback,
+                    )
+                }
+            }
+        }
+
         logGap(
             "stream_synth sentenceIndex=$sentenceIndex ms=$synthesisMs " +
                 "started=${writeState.playbackStarted} totalSamples=${lastStats?.totalSamples ?: 0} " +
@@ -1562,10 +1577,11 @@ class TtsPlaybackService : LifecycleService() {
             shouldContinue = shouldContinue,
             onChunk = chunk@{ samples ->
                 if (!shouldContinue()) return@chunk 0
+                val ready = gain.process(samples)
+                if (ready.isEmpty()) return@chunk 1
                 val framesBefore = pcmPlayer.framesWritten
                 val result = writeStreamChunk(
-                    samples = samples,
-                    gain = gain,
+                    samples = ready,
                     sampleRate = sampleRate,
                     state = writeState,
                     shouldContinue = shouldContinue,
@@ -1626,14 +1642,11 @@ class TtsPlaybackService : LifecycleService() {
 
     private fun writeStreamChunk(
         samples: FloatArray,
-        gain: StreamingGain,
         sampleRate: Int,
         state: StreamChunkWriteState,
         shouldContinue: () -> Boolean,
     ): Int {
         if (sampleRate <= 0 || samples.isEmpty()) return 0
-
-        gain.applyInPlace(samples)
 
         val chunkDurationMs = (samples.size.toLong() * 1000) / sampleRate
         if (state.skipMs >= chunkDurationMs) {
@@ -1683,7 +1696,16 @@ class TtsPlaybackService : LifecycleService() {
     ): StreamingSynthStats? {
         if (batch == null || !batch.isPlayable()) return null
         val rate = batch.sampleRate.takeIf { it > 0 } ?: sampleRate
-        val result = writeStreamChunk(batch.samples, gain, rate, state, shouldContinue)
+        val ready = gain.process(batch.samples)
+        if (ready.isEmpty()) {
+            return StreamingSynthStats(
+                sampleRate = rate,
+                totalSamples = batch.samples.size,
+                callbackInvocations = 1,
+                stoppedEarly = false,
+            )
+        }
+        val result = writeStreamChunk(ready, rate, state, shouldContinue)
         if (result < 0) return null
         if (result == 0 && !state.playbackStarted) return null
         return StreamingSynthStats(

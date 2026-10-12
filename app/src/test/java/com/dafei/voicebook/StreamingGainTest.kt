@@ -2,6 +2,7 @@ package com.dafei.voicebook
 
 import com.dafei.voicebook.tts.StreamingGain
 import com.dafei.voicebook.tts.TtsAudioProfile
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import kotlin.math.abs
@@ -9,49 +10,74 @@ import kotlin.math.sqrt
 
 class StreamingGainTest {
     @Test
-    fun locksGainAfterWarmUpWindow() {
+    fun onsetIsBufferedUntilGainLocks() {
         val gain = StreamingGain()
-        val chunk1 = FloatArray(5000) { 0.05f }
-        val chunk2 = FloatArray(5000) { 0.05f }
+        val chunk1 = FloatArray(2000) { 0.05f }
+        val chunk2 = FloatArray(2000) { 0.05f }
+        val chunk3 = FloatArray(2000) { 0.05f }
 
-        gain.applyInPlace(chunk1)
-        val rmsAfterFirst = rms(chunk1)
-        gain.applyInPlace(chunk2)
-        val rmsAfterSecond = rms(chunk2)
+        assertTrue(gain.process(chunk1).isEmpty())
+        assertTrue(gain.process(chunk2).isEmpty())
+        assertTrue(chunk1.all { it == 0.05f })
 
-        assertTrue(rmsAfterFirst in 0.08f..0.16f)
-        assertTrue(abs(rmsAfterFirst - rmsAfterSecond) < 0.02f)
-        assertTrue(chunk1.maxOf { abs(it) } <= TtsAudioProfile.MAX_PEAK + 0.01f)
+        val out = gain.process(chunk3)
+        assertEquals(6000, out.size)
+        assertEquals(TtsAudioProfile.TARGET_RMS, rms(out), 0.02f)
+        assertTrue(out.maxOf { abs(it) } <= TtsAudioProfile.MAX_PEAK + 0.01f)
+        assertTrue(gain.flush().isEmpty())
     }
 
     @Test
-    fun ignoresSilentLeadIn() {
+    fun locksAndAmplifiesWithinOneChunk() {
+        val gain = StreamingGain()
+        val chunk = FloatArray(5000) { 0.05f }
+
+        val out = gain.process(chunk)
+        assertEquals(5000, out.size)
+        assertEquals(TtsAudioProfile.TARGET_RMS, rms(out), 0.02f)
+        assertTrue(out.maxOf { abs(it) } <= TtsAudioProfile.MAX_PEAK + 0.01f)
+    }
+
+    @Test
+    fun flushNormalizesShortSentence() {
+        val gain = StreamingGain()
+        val chunk = FloatArray(1000) { 0.03f }
+
+        assertTrue(gain.process(chunk).isEmpty())
+        val out = gain.flush()
+        assertEquals(1000, out.size)
+        assertEquals(TtsAudioProfile.TARGET_RMS, rms(out), 0.02f)
+    }
+
+    @Test
+    fun flushIsEmptyWhenNothingBuffered() {
+        assertTrue(StreamingGain().flush().isEmpty())
+    }
+
+    @Test
+    fun silentLeadInIsBufferedThenAmplifiedWithSpeech() {
         val gain = StreamingGain()
         val silent = FloatArray(5000) { 0f }
         val speech = FloatArray(5000) { 0.03f }
 
-        gain.applyInPlace(silent)
-        assertTrue(silent.all { it == 0f })
+        assertTrue(gain.process(silent).isEmpty())
 
-        gain.applyInPlace(speech)
-        val speechRms = rms(speech)
-        assertTrue(speechRms in 0.08f..0.16f)
+        val out = gain.process(speech)
+        assertEquals(10000, out.size)
+        assertTrue(out.copyOfRange(0, 5000).all { it == 0f })
+        assertEquals(TtsAudioProfile.TARGET_RMS, rms(out.copyOfRange(5000, 10000)), 0.02f)
     }
 
     @Test
     fun resetAllowsNewEstimate() {
         val gain = StreamingGain()
-        val quiet = FloatArray(5000) { 0.03f }
-        val loud = FloatArray(5000) { 0.2f }
-
-        gain.applyInPlace(quiet)
+        gain.process(FloatArray(5000) { 0.03f })
 
         gain.reset()
-        gain.applyInPlace(loud)
-        val loudRms = rms(loud)
+        val out = gain.process(FloatArray(5000) { 0.2f })
 
-        assertTrue(loudRms in 0.08f..0.16f)
-        assertTrue(loud.maxOf { abs(it) } <= TtsAudioProfile.MAX_PEAK + 0.01f)
+        assertEquals(TtsAudioProfile.TARGET_RMS, rms(out), 0.02f)
+        assertTrue(out.maxOf { abs(it) } <= TtsAudioProfile.MAX_PEAK + 0.01f)
     }
 
     private fun rms(samples: FloatArray): Float {

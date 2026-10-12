@@ -130,7 +130,7 @@ class TtsPreviewController(
 
                 for (chunk in audioChunks) {
                     if (!shouldContinue()) return@withContext
-                    val written = playPreviewChunkOnIo(
+                    playPreviewChunkOnIo(
                         chunk = chunk,
                         gain = gain,
                         sampleRateHolder = { sampleRate },
@@ -144,9 +144,20 @@ class TtsPreviewController(
                         },
                         shouldContinue = shouldContinue,
                     )
-                    if (written <= 0 && !playbackStarted) {
-                        Log.w(TAG, "preview chunk write produced no samples")
+                }
+
+                // Flush the look-ahead warm-up window (short clips may never reach the lock threshold).
+                val tail = gain.flush()
+                if (tail.isNotEmpty() && sampleRate > 0) {
+                    if (!playbackStarted) {
+                        player.ensurePlaying()
+                        framesBeforePreview = player.framesWritten
+                        playbackStarted = true
                     }
+                    player.writeSamples(tail, shouldContinue)
+                }
+                if (!playbackStarted) {
+                    Log.w(TAG, "preview chunk writes produced no samples")
                 }
 
                 if (sampleRate <= 0) {
@@ -267,9 +278,10 @@ class TtsPreviewController(
             onSampleRate(rate)
         }
 
-        gain.applyInPlace(chunk.samples)
+        val ready = gain.process(chunk.samples)
+        if (ready.isEmpty()) return 0
         onFirstPlaybackStart()
-        val written = player.writeSamples(chunk.samples, shouldContinue)
+        val written = player.writeSamples(ready, shouldContinue)
         return written.coerceAtLeast(0)
     }
 
