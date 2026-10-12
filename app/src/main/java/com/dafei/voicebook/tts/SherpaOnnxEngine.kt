@@ -4,6 +4,7 @@ import android.util.Log
 import com.k2fsa.sherpa.onnx.OfflineTts
 import com.k2fsa.sherpa.onnx.OfflineTtsConfig
 import com.k2fsa.sherpa.onnx.OfflineTtsKokoroModelConfig
+import com.k2fsa.sherpa.onnx.OfflineTtsMatchaModelConfig
 import com.k2fsa.sherpa.onnx.OfflineTtsModelConfig
 import com.k2fsa.sherpa.onnx.getOfflineTtsConfig
 import java.io.File
@@ -322,6 +323,24 @@ class SherpaOnnxEngine : TtsEngine {
                     )
                     null
                 }
+                "matcha" -> OfflineTtsConfig(
+                    model = OfflineTtsModelConfig(
+                        matcha = OfflineTtsMatchaModelConfig(
+                            acousticModel = "$dir/${assets.modelName}",
+                            vocoder = "$dir/${assets.vocoder}",
+                            tokens = "$dir/tokens.txt",
+                            lexicon = if (assets.lexicon.isNotEmpty()) "$dir/${assets.lexicon}" else "",
+                            dataDir = assets.dataDir,
+                            dictDir = assets.dictDir,
+                        ),
+                        numThreads = numThreads,
+                        debug = false,
+                        provider = "cpu",
+                    ),
+                    ruleFsts = assets.ruleFsts,
+                    ruleFars = "",
+                    maxNumSentences = 1,
+                )
                 "kokoro" -> OfflineTtsConfig(
                     model = OfflineTtsModelConfig(
                         kokoro = OfflineTtsKokoroModelConfig(
@@ -358,10 +377,52 @@ class SherpaOnnxEngine : TtsEngine {
 
         private fun resolveTtsAssets(modelDir: File, modelType: String): ResolvedTtsAssets? {
             return when (modelType) {
+                "matcha" -> resolveMatchaAssets(modelDir)
                 "kokoro" -> resolveKokoroAssets(modelDir)
                 "kitten" -> resolveKittenAssets(modelDir)
                 else -> resolveVitsAssets(modelDir)
             }
+        }
+
+        private fun resolveMatchaAssets(modelDir: File): ResolvedTtsAssets? {
+            val children = modelDir.listFiles() ?: return null
+            if (!File(modelDir, "tokens.txt").isFile) return null
+
+            val onnxFiles = children.filter {
+                it.isFile &&
+                    it.extension == "onnx" &&
+                    !it.name.contains("espeak", ignoreCase = true)
+            }
+            val vocoderFile = onnxFiles.firstOrNull {
+                it.name.contains("vocos", ignoreCase = true) ||
+                    it.name.contains("vocoder", ignoreCase = true) ||
+                    it.name.contains("hifigan", ignoreCase = true)
+            } ?: return null
+            val acousticFile = onnxFiles.firstOrNull { it != vocoderFile } ?: return null
+
+            val espeakDir = children.firstOrNull {
+                it.isDirectory &&
+                    (it.name.contains("espeak", ignoreCase = true) || it.name == "espeak-ng-data")
+            } ?: return null
+
+            val lexiconFile = children.firstOrNull {
+                it.isFile && it.name == "lexicon.txt"
+            }
+            val dictDirFile = children.firstOrNull { it.isDirectory && it.name == "dict" }
+
+            val ruleFsts = MATCHA_FST_FILES.mapNotNull { name ->
+                File(modelDir, name).takeIf { it.isFile }?.absolutePath
+            }.joinToString(",")
+
+            return ResolvedTtsAssets(
+                modelName = acousticFile.name,
+                voices = "",
+                lexicon = lexiconFile?.name ?: "",
+                dataDir = espeakDir.absolutePath,
+                dictDir = dictDirFile?.absolutePath ?: "",
+                ruleFsts = ruleFsts,
+                vocoder = vocoderFile.name,
+            )
         }
 
         private fun resolveVitsAssets(modelDir: File): ResolvedTtsAssets? {
@@ -505,6 +566,12 @@ class SherpaOnnxEngine : TtsEngine {
             "number-zh.fst",
         )
 
+        private val MATCHA_FST_FILES = listOf(
+            "phone-zh.fst",
+            "date-zh.fst",
+            "number-zh.fst",
+        )
+
         private data class ResolvedTtsAssets(
             val modelName: String,
             val voices: String,
@@ -512,6 +579,7 @@ class SherpaOnnxEngine : TtsEngine {
             val dataDir: String,
             val dictDir: String,
             val ruleFsts: String,
+            val vocoder: String = "",
         )
     }
 }

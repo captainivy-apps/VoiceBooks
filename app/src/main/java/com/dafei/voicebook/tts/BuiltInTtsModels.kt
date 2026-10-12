@@ -5,6 +5,9 @@ import com.dafei.voicebook.data.model.TtsModelInfo
 
 object BuiltInTtsModels {
     private const val BASE_URL = "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models"
+    private const val VOCODER_URL = "https://github.com/k2-fsa/sherpa-onnx/releases/download/vocoder-models"
+
+    private const val MATCHA_ZH_EN_VOCODER = "$VOCODER_URL/vocos-16khz-univ.onnx"
 
     private val VITS_MODELS = listOf(
         TtsModelInfo(
@@ -455,6 +458,20 @@ object BuiltInTtsModels {
         ),
     )
 
+    private val MATCHA_MODELS = listOf(
+        TtsModelInfo(
+            id = "matcha-icefall-zh-en",
+            name = "中英双语 Matcha",
+            language = "zh+en",
+            sizeBytes = 132_916_686L,
+            downloadUrl = "$BASE_URL/matcha-icefall-zh-en.tar.bz2",
+            modelType = "matcha",
+            family = TtsModelFamily.MATCHA,
+            speakerCount = 1,
+            extraAssetUrl = MATCHA_ZH_EN_VOCODER,
+        ),
+    )
+
     private val KOKORO_MODELS = listOf(
         TtsModelInfo(
             id = "kokoro-multi-lang-v1_1",
@@ -521,10 +538,11 @@ object BuiltInTtsModels {
         ),
     )
 
-    val MODELS: List<TtsModelInfo> = VITS_MODELS + KOKORO_MODELS + KITTEN_MODELS
+    val MODELS: List<TtsModelInfo> = VITS_MODELS + MATCHA_MODELS + KOKORO_MODELS + KITTEN_MODELS
 
     val FAMILIES: List<TtsModelFamily> = listOf(
         TtsModelFamily.VITS,
+        TtsModelFamily.MATCHA,
         TtsModelFamily.KOKORO,
         TtsModelFamily.KITTEN,
     )
@@ -542,6 +560,18 @@ object BuiltInTtsModels {
         val base = mirrorBaseUrl.trim().trimEnd('/')
         if (base.isEmpty()) return null
         val fileName = infoFor(modelId)?.downloadUrl?.substringAfterLast('/')?.takeIf { it.isNotEmpty() }
+            ?: return null
+        return "$base/$fileName"
+    }
+
+    /**
+     * Build a mirror download URL for the standalone [TtsModelInfo.extraAssetUrl] of [modelId].
+     * Returns null when no base is configured or the model has no extra asset.
+     */
+    fun mirrorExtraAssetUrlFor(modelId: String, mirrorBaseUrl: String): String? {
+        val base = mirrorBaseUrl.trim().trimEnd('/')
+        if (base.isEmpty()) return null
+        val fileName = infoFor(modelId)?.extraAssetUrl?.substringAfterLast('/')?.takeIf { it.isNotEmpty() }
             ?: return null
         return "$base/$fileName"
     }

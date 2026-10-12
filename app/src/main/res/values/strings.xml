@@ -171,6 +171,7 @@
     <string name="tts_applying_speed">正在应用新语速…</string>
 
     <string name="tts_family_vits">VITS</string>
+    <string name="tts_family_matcha">Matcha</string>
     <string name="tts_family_kokoro">Kokoro</string>
     <string name="tts_family_kitten">Kitten</string>
     <string name="tts_language_all">全部语言</string>

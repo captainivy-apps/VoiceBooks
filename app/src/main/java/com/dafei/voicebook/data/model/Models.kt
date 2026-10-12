@@ -80,12 +80,14 @@ data class SentenceIndexSlice(
 
 enum class TtsModelFamily(val id: String) {
     VITS("vits"),
+    MATCHA("matcha"),
     KOKORO("kokoro"),
     KITTEN("kitten"),
     ;
 
     companion object {
         fun fromModelType(modelType: String): TtsModelFamily = when (modelType) {
+            "matcha" -> MATCHA
             "kokoro" -> KOKORO
             "kitten" -> KITTEN
             else -> VITS
@@ -104,6 +106,8 @@ data class TtsModelInfo(
     val speakerId: Int = 0,
     val speakerCount: Int = 1,
     val voicesFile: String = "voices.bin",
+    /** Extra standalone model file (e.g. Matcha vocoder) downloaded alongside the archive. */
+    val extraAssetUrl: String? = null,
 )
 
 data class TtsModelBenchmark(

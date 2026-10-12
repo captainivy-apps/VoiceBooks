@@ -67,6 +67,57 @@ class TtsModelDownloader(
         }
     }
 
+    suspend fun downloadFile(
+        url: String,
+        targetFile: File,
+        onProgress: (Float) -> Unit,
+    ): TtsModelDownloadResult = withContext(Dispatchers.IO) {
+        val tempFile = File(targetFile.parentFile, "${targetFile.name}.tmp")
+        try {
+            val request = Request.Builder().url(url).build()
+            okHttpClient.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) {
+                    return@withContext TtsModelDownloadResult.Failure(
+                        "服务器返回错误：HTTP ${response.code}",
+                    )
+                }
+                val body = response.body
+                    ?: return@withContext TtsModelDownloadResult.Failure("服务器响应为空")
+                val total = body.contentLength()
+                var downloaded = 0L
+
+                body.byteStream().use { input ->
+                    FileOutputStream(tempFile).use { output ->
+                        val buffer = ByteArray(8192)
+                        var read: Int
+                        while (input.read(buffer).also { read = it } != -1) {
+                            output.write(buffer, 0, read)
+                            downloaded += read
+                            if (total > 0) {
+                                onProgress(downloaded.toFloat() / total.toFloat())
+                            }
+                        }
+                    }
+                }
+            }
+
+            targetFile.parentFile?.mkdirs()
+            if (targetFile.exists()) targetFile.delete()
+            if (!tempFile.renameTo(targetFile)) {
+                tempFile.copyTo(targetFile, overwrite = true)
+                tempFile.delete()
+            }
+            onProgress(1f)
+            TtsModelDownloadResult.Success
+        } catch (e: CancellationException) {
+            tempFile.delete()
+            throw e
+        } catch (e: Exception) {
+            tempFile.delete()
+            TtsModelDownloadResult.Failure(e.message ?: "网络连接失败")
+        }
+    }
+
     private fun extractTarBz2(archive: File, targetDir: File) {
         BufferedInputStream(BZip2CompressorInputStream(BufferedInputStream(archive.inputStream()))).use { bzIn ->
             TarArchiveInputStream(bzIn).use { tarIn ->

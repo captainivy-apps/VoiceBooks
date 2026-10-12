@@ -130,8 +130,8 @@ class TtsRepository(
         val targetDir = fileStorage.ttsModelDir(modelId)
         targetDir.deleteRecursively()
 
+        val mirrorBaseUrl = settingsRepository.settings.first().mirrorBaseUrl
         val url = if (useMirror) {
-            val mirrorBaseUrl = settingsRepository.settings.first().mirrorBaseUrl
             BuiltInTtsModels.mirrorUrlFor(modelId, mirrorBaseUrl)
                 ?: return TtsModelDownloadResult.Failure("未配置镜像地址").also {
                     dao.updateDownloadState(modelId, TtsDownloadState.FAILED.name, null, "未配置镜像地址")
@@ -154,20 +154,31 @@ class TtsRepository(
                     )
                     downloadResult
                 }
-                SherpaOnnxEngine.isModelLayoutValid(targetDir, model.modelType) -> {
-                    dao.updateDownloadState(
-                        modelId,
-                        TtsDownloadState.DOWNLOADED.name,
-                        targetDir.absolutePath,
-                        null,
-                    )
-                    TtsModelDownloadResult.Success
-                }
                 else -> {
-                    cleanupPartialDownload(modelId)
-                    val error = "模型文件不完整或格式无效"
-                    dao.updateDownloadState(modelId, TtsDownloadState.FAILED.name, null, error)
-                    TtsModelDownloadResult.Failure(error)
+                    val extraFailure = downloadExtraAssets(modelId, targetDir, useMirror, mirrorBaseUrl, onProgress)
+                    if (extraFailure != null) {
+                        cleanupPartialDownload(modelId)
+                        dao.updateDownloadState(
+                            modelId,
+                            TtsDownloadState.FAILED.name,
+                            null,
+                            extraFailure.message,
+                        )
+                        extraFailure
+                    } else if (SherpaOnnxEngine.isModelLayoutValid(targetDir, model.modelType)) {
+                        dao.updateDownloadState(
+                            modelId,
+                            TtsDownloadState.DOWNLOADED.name,
+                            targetDir.absolutePath,
+                            null,
+                        )
+                        TtsModelDownloadResult.Success
+                    } else {
+                        cleanupPartialDownload(modelId)
+                        val error = "模型文件不完整或格式无效"
+                        dao.updateDownloadState(modelId, TtsDownloadState.FAILED.name, null, error)
+                        TtsModelDownloadResult.Failure(error)
+                    }
                 }
             }
         } catch (e: CancellationException) {
@@ -175,6 +186,32 @@ class TtsRepository(
             markDownloadInterrupted(modelId)
             throw e
         }
+    }
+
+    /** Download standalone extra assets (e.g. Matcha vocoder) that ship outside the model archive. */
+    private suspend fun downloadExtraAssets(
+        modelId: String,
+        targetDir: java.io.File,
+        useMirror: Boolean,
+        mirrorBaseUrl: String,
+        onProgress: (Float) -> Unit,
+    ): TtsModelDownloadResult.Failure? {
+        val extraUrl = BuiltInTtsModels.infoFor(modelId)?.extraAssetUrl ?: return null
+        val fileName = extraUrl.substringAfterLast('/').takeIf { it.isNotEmpty() } ?: return null
+        val targetFile = java.io.File(targetDir, fileName)
+
+        val mirroredUrl = if (useMirror) {
+            BuiltInTtsModels.mirrorExtraAssetUrlFor(modelId, mirrorBaseUrl)
+        } else {
+            null
+        }
+
+        if (mirroredUrl != null) {
+            val mirrored = downloader.downloadFile(mirroredUrl, targetFile, onProgress)
+            if (mirrored is TtsModelDownloadResult.Success) return null
+        }
+        val result = downloader.downloadFile(extraUrl, targetFile, onProgress)
+        return result as? TtsModelDownloadResult.Failure
     }
 
     suspend fun recoverInterruptedDownloads() {

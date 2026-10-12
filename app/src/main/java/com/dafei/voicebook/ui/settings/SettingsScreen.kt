@@ -650,6 +650,7 @@ private fun TtsManagementTab(
                         Text(
                             when (family) {
                                 TtsModelFamily.VITS -> stringResource(R.string.tts_family_vits)
+                                TtsModelFamily.MATCHA -> stringResource(R.string.tts_family_matcha)
                                 TtsModelFamily.KOKORO -> stringResource(R.string.tts_family_kokoro)
                                 TtsModelFamily.KITTEN -> stringResource(R.string.tts_family_kitten)
                             },

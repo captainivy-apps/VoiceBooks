@@ -22,6 +22,7 @@
 - 未下载模型时无法播放，会提示前往设置下载
 - 合成或播放失败时会在界面显示具体错误信息，详情可查看 logcat（`SherpaOnnxEngine` / `TtsPlaybackService`）
 - 中文推荐模型：`vits-piper-zh_CN-xiao_ya-medium`（高品质）或 `vits-piper-zh_CN-xiao_ya-medium-int8` / `vits-icefall-zh-aishell3`（轻量）
+- 中英双语推荐模型：`matcha-icefall-zh-en`（Matcha，需额外下载 Vocos 声码器，应用会自动一并获取）
 - 设置页 TTS 管理已按语言分区展示，可用顶部 Chip 快速筛选
 - 英文推荐模型：`vits-piper-en_US-lessac-medium`
 
